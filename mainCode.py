@@ -17,10 +17,14 @@ constant = 0.006 #Constant value for converting pulse count to liters
 time_new = 0.0 #Initialize time since running program
 rpt_int = 10
 potentialLeakPresent = False
+page_counter = 1
+up = 5 #This is the GPIO pin for the "page up" button
+GPIO.setup(up, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+buttonPress = True
 
-global rate_count, tot_count
-rate_count = 0
-tot_count = 0
+#MAIN
+rpt_int = int(input('Input desired report interval in seconds '))#Ask user for interval for reporting 
+print('Reports every ', rpt_int,' seconds')
 
 #Everytime the magnet passes the sensor, it counts the pulse
 def Pulse_count(waterFlowPin):
@@ -31,46 +35,77 @@ def Pulse_count(waterFlowPin):
 #Add falling edge detection for pin 13 and ignoring further edge detection for 10ms
 GPIO.add_event_detect(waterFlowPin, GPIO.FALLING, callback=Pulse_count, bouncetime = 10)
 
-#MAIN
-rpt_int = int(input('Input desired report interval in seconds '))#Ask user for interval for reporting 
-print('Reports every ', rpt_int,' seconds')
-
+global rate_count, tot_count
+rate_count = 0
+tot_count = 0
 
 #Buzzer function
 def soundAlarm():
     BuzzerOp = GPIO.PWM(buzzerPinNum, 200)
     BuzzerOp.start(90)
-    time.sleep(1)
+    time.sleep(0.7)
     BuzzerOp.stop()
-    time.sleep(1)
-
+    time.sleep(0.7)
+    
 while True:
     time_new = time.time()+rpt_int #time since running incremented by the report interval
     rate_count = 0 #Reset rate count
-    time.sleep(1)
-    LperM = round(((rate_count*constant)/(rpt_int/60)),2) #Converts rate count to liters and report interval to minutes
-    TotLit = round(tot_count * constant,1) #Converts total count to liters
-    print('\nLiters / min', LperM, '(', rpt_int, 'second sample)')
-    print('Total Liters ' , TotLit)
-    lcdDisplay.set("Water Reporting",1)
-    lcdDisplay.set("Flow Rate:",2)
-    lcdDisplay.set(str(LperM), 3)
-    lcdDisplay.set("Liters/Minute", 4)
-    time.sleep(1)
-    lcdDisplay.clear()
+    time.sleep(0.7)
+        
+    if page_counter == 1:
+        LperM = round(((rate_count*constant)/(rpt_int/60)),2) #Converts rate count to liters and report interval to minutes
+        TotLit = round(tot_count * constant,1) #Converts total count to liters
+        print('\nLiters / min', LperM, '(', rpt_int, 'second sample)')
+        print('Total Liters ' , TotLit)
+        lcdDisplay.set("Water Reporting", 1)
+        lcdDisplay.set("Flow Rate:", 2)
+        lcdDisplay.set(str(LperM), 3)
+        lcdDisplay.set("Liters/Minute", 4)
+        time.sleep(0.7)
+        lcdDisplay.clear()
     
-    if (LperM < 10 or LperM > 25):
-        potentialLeakPresent = True
+        if (LperM < 10 or LperM > 25):
+            potentialLeakPresent = True
     
-    if (LperM < 1):
-        potentialLeakPresent = False
+        if (LperM < 1):
+            potentialLeakPresent = False
         
-    if (LperM == 0):
-        print('No flow')
+        if (LperM == 0):
+            print('No flow')
         
         
-    if (potentialLeakPresent):
-        soundAlarm()
+        if (potentialLeakPresent):
+            soundAlarm()
+    elif page_counter == 2:
+        OperM = round(((rate_count*constant)/(rpt_int/60)) * 33.81402, 2) #Converts liters to ounces and report interval to minutes
+        TotOz = round(tot_count * constant * 33.81402, 1) #Converts total count to ounces
+        print('\nOunces / min', OperM, '(', rpt_int, 'second sample)')
+        print('Total Ounces ' , TotOz)
+        lcdDisplay.set("Water Reporting",1)
+        lcdDisplay.set("Flow Rate:",2)
+        lcdDisplay.set(str(OperM), 3)
+        lcdDisplay.set("Ounces/Minute", 4)
+        time.sleep(0.7)
+        lcdDisplay.clear()
+    
+        if (OperM < 338.1402 or OperM > 845.3506):
+            potentialLeakPresent = True
+    
+        if (OperM < 33.81402):
+            potentialLeakPresent = False
+        
+        if (OperM == 0):
+            print('No flow')
+        
+        
+        if (potentialLeakPresent):
+            soundAlarm()
+    else:
+        page_counter = 1
+    
+    buttonPress = GPIO.input(up)
+    if buttonPress == False:
+        page_counter += 1
         
 GPIO.cleanup()
 print('Done')
